@@ -140,8 +140,8 @@ export default function FileListScreen() {
 
   const handleUpdate = (item: FileItem) => {
     setSelectedFile(item);
-    setNewTitle(item.title);
-    setNewDesc(item.description);
+    setNewTitle(item.title || "");
+    setNewDesc(item.description || "");
     setNewFile(null);
     setUpdateModalVisible(true);
   };
@@ -164,8 +164,8 @@ export default function FileListScreen() {
       setUpdating(true); // start loading
 
       const formData = new FormData();
-      formData.append("title", newTitle);
-      formData.append("description", newDesc);
+      formData.append("title", newTitle || "");
+      formData.append("description", newDesc || "");
 
       if (newFile) {
         formData.append("file", {
