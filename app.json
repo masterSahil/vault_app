@@ -13,7 +13,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0a0c3f",
         "foregroundImage": "./assets/images/lock.png",
         "backgroundImage": "./assets/images/lock.png",
         "monochromeImage": "./assets/images/lock.png"
@@ -34,12 +34,13 @@
           "image": "./assets/images/lock.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#17618C",
+          "backgroundColor": "#0a0c3f",
           "dark": {
-            "backgroundColor": "#17618C"
+            "backgroundColor": "#0a0c3f"
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
