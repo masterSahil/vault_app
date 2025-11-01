@@ -93,7 +93,7 @@ export default function LoginMPIN() {
       </View>
 
       <View style={{width: '100%'}}>
-        <Text style={[MainStyles.textWhite, styles.mpinText, {textAlign: "left"}]}>Enter Mpin</Text>
+        <Text style={[MainStyles.textWhite, styles.mpinText, {textAlign: "left"}]}>Enter Email</Text>
         {/* Email Input */}
         <TextInput
           style={styles.input}

@@ -30,32 +30,39 @@ export default function FileListScreen() {
   const [newFile, setNewFile] =
     useState<DocumentPicker.DocumentPickerAsset | null>(null);
   const [updating, setUpdating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const router = useRouter();
   const API_URL = "https://backend-1-60y9.onrender.com";
 
   const fetchFiles = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      Toast.show({
-        type: "info",
-        text1: "Loading Files...",
-        autoHide: false,
-      });
-      const res = await axios.get<{ files: FileItem[] }>(`${API_URL}/files`);
+      Toast.show({ type: "info", text1: "Loading Files...", autoHide: false });
+
       const email = await AsyncStorage.getItem("email");
-      const response = await axios.post(`${API_URL}/findUser`, { email });
-      const allFilesData = res.data.files;
-      const filtered = allFilesData.filter(
-        (fileData) => fileData.userId === response.data.user._id
-      );
+      if (!email) throw new Error("User email not found");
+
+      // Fetch user
+      const userRes = await axios.post(`${API_URL}/findUser`, { email });
+      const userId = userRes.data.user?._id;
+      if (!userId) throw new Error("User not found");
+
+      // Fetch files
+      const res = await axios.get(`${API_URL}/files`);
+      const allFilesData = res.data.files || [];
+      const filtered = allFilesData.filter((file) => file.userId === userId);
+
       setFiles(filtered);
-      Toast.hide();
       Toast.show({ type: "success", text1: "Files fetched successfully" });
     } catch (err: unknown) {
-      Toast.show({ type: "error", text1: "Failed to fetch Files" });
       console.log("Error fetching files:", (err as Error).message);
+      setError("Failed to load files. Check your connection or try again.");
       setFiles([]);
+      Toast.show({ type: "error", text1: "Failed to fetch files" });
     } finally {
+      Toast.hide();
       setLoading(false);
     }
   };
@@ -285,16 +292,26 @@ export default function FileListScreen() {
         <View style={{ width: 24 }} /> 
       </View>
 
-      <FlatList
-        data={files}
-        keyExtractor={(item) => item._id}
-        renderItem={renderFileItem}
-        ListEmptyComponent={
-          <Text style={styles.noDataText}>No files uploaded yet 📂</Text>
-        }
-        contentContainerStyle={{ paddingBottom: 100 }}
-        showsVerticalScrollIndicator={false}
-      />
+      {loading ? (
+        <Text style={styles.noDataText}>Loading files...</Text>
+      ) : error ? (
+        <View style={{ alignItems: "center", marginTop: 50 }}>
+          <Text style={{ color: "red", fontSize: 16, marginBottom: 10 }}>{error}</Text>
+          <TouchableOpacity onPress={fetchFiles} style={{ backgroundColor: "#2196F3", padding: 10, borderRadius: 6 }}>
+            <Text style={{ color: "#fff" }}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : files.length === 0 ? (
+        <Text style={styles.noDataText}>No files uploaded yet 📂</Text>
+      ) : (
+        <FlatList
+          data={files}
+          keyExtractor={(item) => item._id}
+          renderItem={renderFileItem}
+          contentContainerStyle={{ paddingBottom: 100 }}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
 
       {/* Update Modal */}
       <Modal visible={updateModalVisible} animationType="slide" transparent>
