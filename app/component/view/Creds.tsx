@@ -4,14 +4,15 @@ import axios from "axios";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    Alert,
-    ScrollView,
-    Share,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  ActivityIndicator, // 👈 added for loader
 } from "react-native";
 import Toast from "react-native-toast-message"; // ✅ Toast
 
@@ -26,6 +27,7 @@ type Cred = {
 
 export default function CredentialsScreen() {
   const [creds, setCreds] = useState<Cred[]>([]);
+  const [loading, setLoading] = useState(true); // 👈 loader state
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
   const [editingCred, setEditingCred] = useState<string | null>(null);
   const [editSite, setEditSite] = useState("");
@@ -37,11 +39,13 @@ export default function CredentialsScreen() {
 
   const getData = async () => {
     try {
+      setLoading(true); // 👈 start loader
       Toast.show({
         type: "info",
         text1: "Loading Credentials...",
-        autoHide: false, 
+        autoHide: false,
       });
+
       const res = await axios.get<{ cred: Cred[] }>(`${API_URL}/creds`);
       const email = await AsyncStorage.getItem("email");
       const user = await axios.post(`${API_URL}/findUser`, { email });
@@ -51,10 +55,13 @@ export default function CredentialsScreen() {
 
       setCreds(matched || []);
       Toast.hide();
-      Toast.show({ type: "success", text1: "Credentials loaded" });
+      Toast.show({ type: "success", text1: "Credentials loaded successfully" });
     } catch (error) {
       console.log(error);
       Toast.show({ type: "error", text1: "Error fetching credentials" });
+    } finally {
+      setLoading(false); // 👈 stop loader
+      Toast.hide();
     }
   };
 
@@ -133,153 +140,203 @@ export default function CredentialsScreen() {
         <View style={{ width: 26 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {creds.length === 0 ? (
-          <Text style={{ color: "#aaa", textAlign: "center", marginTop: 30 }}>
-            No credentials added yet.
-          </Text>
-        ) : (
-          creds.map((cred) => (
-            <View key={cred._id} style={styles.card}>
-              {editingCred === cred._id ? (
-                <View>
-                  {/* Editing Inputs */}
-                  <TextInput
-                    value={editSite}
-                    onChangeText={setEditSite}
-                    placeholder="App / Site"
-                    placeholderTextColor="#999"
-                    style={styles.input}
-                  />
-                  <TextInput
-                    value={editUsername}
-                    onChangeText={setEditUsername}
-                    placeholder="Username"
-                    placeholderTextColor="#999"
-                    style={styles.input}
-                  />
-                  <TextInput
-                    value={editEmail}
-                    onChangeText={setEditEmail}
-                    placeholder="Email"
-                    placeholderTextColor="#999"
-                    style={styles.input}
-                  />
-
-                  {/* Password Input with toggle */}
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      borderColor: "#00F2C2",
-                      borderWidth: 1,
-                      borderRadius: 6,
-                    }}
-                  >
+      {/* ✅ Loader added here */}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#00F2C2" />
+          <Text style={styles.loadingText}>Loading Credentials...</Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          {creds.length === 0 ? (
+            <Text style={{ color: "#aaa", textAlign: "center", marginTop: 30 }}>
+              No credentials added yet.
+            </Text>
+          ) : (
+            creds.map((cred) => (
+              <View key={cred._id} style={styles.card}>
+                {editingCred === cred._id ? (
+                  <View>
+                    {/* Editing Inputs */}
                     <TextInput
-                      value={editPassword}
-                      onChangeText={setEditPassword}
-                      placeholder="Password"
+                      value={editSite}
+                      onChangeText={setEditSite}
+                      placeholder="App / Site"
                       placeholderTextColor="#999"
-                      secureTextEntry={!visiblePasswords[cred._id]}
-                      style={{ flex: 1, padding: 10, color: "#fff", fontSize: 16 }}
+                      style={styles.input}
                     />
-                    <TouchableOpacity
-                      onPress={() => togglePassword(cred._id)}
-                      style={{ padding: 8 }}
+                    <TextInput
+                      value={editUsername}
+                      onChangeText={setEditUsername}
+                      placeholder="Username"
+                      placeholderTextColor="#999"
+                      style={styles.input}
+                    />
+                    <TextInput
+                      value={editEmail}
+                      onChangeText={setEditEmail}
+                      placeholder="Email"
+                      placeholderTextColor="#999"
+                      style={styles.input}
+                    />
+
+                    {/* Password Input with toggle */}
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        borderColor: "#00F2C2",
+                        borderWidth: 1,
+                        borderRadius: 6,
+                      }}
                     >
-                      <Ionicons
-                        name={visiblePasswords[cred._id] ? "eye-outline" : "eye-off-outline"}
-                        size={22}
-                        color="#00F2C2"
+                      <TextInput
+                        value={editPassword}
+                        onChangeText={setEditPassword}
+                        placeholder="Password"
+                        placeholderTextColor="#999"
+                        secureTextEntry={!visiblePasswords[cred._id]}
+                        style={{ flex: 1, padding: 10, color: "#fff", fontSize: 16 }}
                       />
-                    </TouchableOpacity>
-                  </View>
+                      <TouchableOpacity
+                        onPress={() => togglePassword(cred._id)}
+                        style={{ padding: 8 }}
+                      >
+                        <Ionicons
+                          name={
+                            visiblePasswords[cred._id] ? "eye-outline" : "eye-off-outline"
+                          }
+                          size={22}
+                          color="#00F2C2"
+                        />
+                      </TouchableOpacity>
+                    </View>
 
-                  <View style={styles.actions}>
-                    <TouchableOpacity style={styles.actionBtn} onPress={saveEdit}>
-                      <Ionicons name="checkmark-circle-outline" size={20} color="#00F2C2" />
-                      <Text style={[styles.actionText, { color: "#00F2C2" }]}>Save</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.actionBtn}
-                      onPress={() => setEditingCred(null)}
-                    >
-                      <Ionicons name="close-circle-outline" size={20} color="#ff4d4d" />
-                      <Text style={[styles.actionText, { color: "#ff4d4d" }]}>Cancel</Text>
-                    </TouchableOpacity>
+                    <View style={styles.actions}>
+                      <TouchableOpacity style={styles.actionBtn} onPress={saveEdit}>
+                        <Ionicons
+                          name="checkmark-circle-outline"
+                          size={20}
+                          color="#00F2C2"
+                        />
+                        <Text style={[styles.actionText, { color: "#00F2C2" }]}>
+                          Save
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.actionBtn}
+                        onPress={() => setEditingCred(null)}
+                      >
+                        <Ionicons
+                          name="close-circle-outline"
+                          size={20}
+                          color="#ff4d4d"
+                        />
+                        <Text style={[styles.actionText, { color: "#ff4d4d" }]}>
+                          Cancel
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
-              ) : (
-                <>
-                  <View style={styles.cardTop}>
-                    <Ionicons name="person-circle-outline" size={34} color="#00F2C2" />
-                    <Text style={styles.appTitle}>{cred.site}</Text>
-                  </View>
+                ) : (
+                  <>
+                    <View style={styles.cardTop}>
+                      <Ionicons name="person-circle-outline" size={34} color="#00F2C2" />
+                      <Text style={styles.appTitle}>{cred.site}</Text>
+                    </View>
 
-                  {/* ✅ Created Time Row */}
-                  <View style={styles.timeRow}>
-                    <Ionicons name="time-sharp" size={14} color="#bbb" style={{ marginRight: 4 }} />
-                    <Text style={styles.dateText}>
-                      {cred.createdAt ? new Date(Number(cred.createdAt)).toLocaleString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      }) : "N/A"}
-                    </Text>
-                  </View>
-
-                  <View style={styles.detailRow}>
-                    <Text style={styles.label}>Username:</Text>
-                    <Text style={styles.value}>{cred.username}</Text>
-                  </View>
-
-                  <View style={styles.detailRow}>
-                    <Text style={styles.label}>Email:</Text>
-                    <Text style={styles.value}>{cred.userEmail}</Text>
-                  </View>
-
-                  <View style={styles.detailRow}>
-                    <Text style={styles.label}>Password:</Text>
-                    <TouchableOpacity onPress={() => togglePassword(cred._id)}>
+                    {/* ✅ Created Time Row */}
+                    <View style={styles.timeRow}>
                       <Ionicons
-                        name={visiblePasswords[cred._id] ? "eye-outline" : "eye-off-outline"}
-                        size={20}
-                        color="#00F2C2"
-                        style={{ marginRight: 8 }}
+                        name="time-sharp"
+                        size={14}
+                        color="#bbb"
+                        style={{ marginRight: 4 }}
                       />
-                    </TouchableOpacity>
-                    <Text style={styles.value}>
-                      {visiblePasswords[cred._id] ? cred.password : "••••••••"}
-                    </Text>
-                  </View>
+                      <Text style={styles.dateText}>
+                        {cred.createdAt
+                          ? new Date(Number(cred.createdAt)).toLocaleString("en-IN", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : "N/A"}
+                      </Text>
+                    </View>
 
-                  <View style={styles.actions}>
-                    <TouchableOpacity style={styles.actionBtn} onPress={() => editCred(cred)}>
-                      <Ionicons name="create-outline" size={20} color="#fff" />
-                      <Text style={styles.actionText}>Edit</Text>
-                    </TouchableOpacity>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.label}>Username:</Text>
+                      <Text style={styles.value}>{cred.username}</Text>
+                    </View>
 
-                    <TouchableOpacity style={styles.actionBtn} onPress={() => shareCred(cred)}>
-                      <Ionicons name="share-social-outline" size={20} color="#00F2C2" />
-                      <Text style={[styles.actionText, { color: "#00F2C2" }]}>Share</Text>
-                    </TouchableOpacity>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.label}>Email:</Text>
+                      <Text style={styles.value}>{cred.userEmail}</Text>
+                    </View>
 
-                    <TouchableOpacity style={styles.actionBtn} onPress={() => deleteCred(cred._id)}>
-                      <Ionicons name="trash-outline" size={20} color="#ff4d4d" />
-                      <Text style={[styles.actionText, { color: "#ff4d4d" }]}>Delete</Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
-              )}
-            </View>
-          ))
-        )}
-      </ScrollView>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.label}>Password:</Text>
+                      <TouchableOpacity onPress={() => togglePassword(cred._id)}>
+                        <Ionicons
+                          name={
+                            visiblePasswords[cred._id]
+                              ? "eye-outline"
+                              : "eye-off-outline"
+                          }
+                          size={20}
+                          color="#00F2C2"
+                          style={{ marginRight: 8 }}
+                        />
+                      </TouchableOpacity>
+                      <Text style={styles.value}>
+                        {visiblePasswords[cred._id] ? cred.password : "••••••••"}
+                      </Text>
+                    </View>
 
-      {/* Toast Component at bottom */}
+                    <View style={styles.actions}>
+                      <TouchableOpacity
+                        style={styles.actionBtn}
+                        onPress={() => editCred(cred)}
+                      >
+                        <Ionicons name="create-outline" size={20} color="#fff" />
+                        <Text style={styles.actionText}>Edit</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.actionBtn}
+                        onPress={() => shareCred(cred)}
+                      >
+                        <Ionicons name="share-social-outline" size={20} color="#00F2C2" />
+                        <Text
+                          style={[styles.actionText, { color: "#00F2C2" }]}
+                        >
+                          Share
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.actionBtn}
+                        onPress={() => deleteCred(cred._id)}
+                      >
+                        <Ionicons name="trash-outline" size={20} color="#ff4d4d" />
+                        <Text
+                          style={[styles.actionText, { color: "#ff4d4d" }]}
+                        >
+                          Delete
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
+              </View>
+            ))
+          )}
+        </ScrollView>
+      )}
+
+      {/* Toast Component */}
       <Toast position="bottom" bottomOffset={60} />
     </View>
   );
@@ -289,6 +346,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0A0C3F", paddingTop: 50, paddingHorizontal: 16 },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 25 },
   headerTitle: { color: "#fff", fontSize: 20, fontWeight: "bold" },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loadingText: { color: "#00F2C2", fontSize: 16, fontWeight: "600", marginTop: 10 },
   scrollContainer: { paddingBottom: 20 },
   card: {
     backgroundColor: "rgba(255,255,255,0.05)",
@@ -298,13 +357,13 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
   },
-  cardTop: { flexDirection: "row", alignItems: "center", marginBottom: 8, flexWrap: "wrap" },
-  appTitle: { color: "#fff", fontSize: 20, fontWeight: "600", marginLeft: 10, flexShrink: 1, flexWrap: "wrap" },
-  detailRow: { flexDirection: "row", alignItems: "center", marginBottom: 6, flexWrap: "wrap" },
+  cardTop: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
+  appTitle: { color: "#fff", fontSize: 20, fontWeight: "600", marginLeft: 10 },
+  detailRow: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
   label: { color: "#aaa", fontSize: 15, width: 90 },
-  value: { color: "#fff", fontSize: 16, flexShrink: 1, flexWrap: "wrap" },
-  actions: { flexDirection: "row", justifyContent: "space-between", marginTop: 14, flexWrap: "wrap" },
-  actionBtn: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 8 },
+  value: { color: "#fff", fontSize: 16, flexShrink: 1 },
+  actions: { flexDirection: "row", justifyContent: "space-between", marginTop: 14 },
+  actionBtn: { flexDirection: "row", alignItems: "center", gap: 5 },
   actionText: { fontSize: 14, color: "#fff" },
   input: {
     backgroundColor: "#1c1a48",
@@ -316,11 +375,11 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     fontSize: 16,
   },
-  timeRow: { flexDirection: "row", alignItems: "center", marginBottom: 20, },
-  dateText: { 
-    fontSize: 13, color: "#bbb",
+  timeRow: { flexDirection: "row", alignItems: "center", marginBottom: 20 },
+  dateText: {
+    fontSize: 13,
+    color: "#bbb",
     includeFontPadding: false,
     textAlignVertical: "center",
   },
-
 });

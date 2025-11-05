@@ -4,7 +4,18 @@ import axios from "axios";
 import { BlurView } from "expo-blur"; // ✅ blur effect
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Alert, FlatList, SafeAreaView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import {
+  Alert,
+  FlatList,
+  SafeAreaView,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  ActivityIndicator, // 👈 for spinner
+} from "react-native";
 import Toast from "react-native-toast-message";
 
 interface Note {
@@ -19,19 +30,22 @@ export default function NotesScreen() {
   const router = useRouter();
 
   const [notes, setNotes] = useState<Note[]>([]);
+  const [loading, setLoading] = useState(true); // 👈 loading state added
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
-  const [revealed, setRevealed] = useState<{ [key: string]: boolean }>({}); // ✅ track per-note visibility
+  const [revealed, setRevealed] = useState<{ [key: string]: boolean }>({});
   const API_URL = "https://backend-1-60y9.onrender.com";
 
   const getData = async () => {
     try {
+      setLoading(true); // 👈 start loading
       Toast.show({
         type: "info",
         text1: "Loading Notes...",
         autoHide: false,
       });
+
       const email = await AsyncStorage.getItem("email");
       const response = await axios.post(`${API_URL}/findUser`, { email });
 
@@ -52,6 +66,9 @@ export default function NotesScreen() {
     } catch (error) {
       console.log(error);
       Toast.show({ type: "error", text1: "Failed to fetch notes" });
+    } finally {
+      setLoading(false); // 👈 stop loading
+      Toast.hide();
     }
   };
 
@@ -185,10 +202,8 @@ export default function NotesScreen() {
           {/* ✅ BlurView Toggle Section */}
           <View style={{ position: "relative", marginBottom: 10 }}>
             {revealed[item._id] ? (
-              // 👉 When revealed: show real content with natural height
               <Text style={styles.noteContent}>{item.note}</Text>
             ) : (
-              // 👉 When hidden: force minHeight for consistent look
               <View style={styles.hiddenBox}>
                 <BlurView
                   intensity={60}
@@ -268,8 +283,13 @@ export default function NotesScreen() {
         <View style={{ width: 24 }} />
       </View>
 
-      {/* Notes List */}
-      {notes.length === 0 ? (
+      {/* ✅ Show loading spinner */}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#00f2c2" />
+          <Text style={styles.loadingText}>Loading Notes...</Text>
+        </View>
+      ) : notes.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No notes available</Text>
         </View>
@@ -321,13 +341,18 @@ const styles = StyleSheet.create({
   actionBtn: { padding: 6, borderRadius: 8, backgroundColor: "#0a0c3f" },
   editInput: {
     backgroundColor: "#0a0c3f",
-    borderColor: "#00f2c2",borderWidth: 1,borderRadius: 8,padding: 8,
+    borderColor: "#00f2c2",
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 8,
     marginBottom: 10,
     color: "#fff",
     fontSize: 15,
   },
   emptyContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
   emptyText: { color: "#d1d5db", fontSize: 16, fontWeight: "500" },
+  loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
+  loadingText: { color: "#00f2c2", fontSize: 16, fontWeight: "600", marginTop: 10 },
   revealBtn: {
     backgroundColor: "rgba(0,0,0,0.5)",
     paddingVertical: 6,
@@ -354,6 +379,5 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
     marginBottom: 10,
   },
-
   hideText: { color: "#ffcc00", fontWeight: "600", fontSize: 14 },
 });

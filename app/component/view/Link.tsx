@@ -3,7 +3,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Alert, Linking, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View,
+import {
+  Alert,
+  Linking,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  ActivityIndicator, // 👈 added spinner
 } from "react-native";
 import Toast from "react-native-toast-message";
 
@@ -17,6 +27,7 @@ type Link = {
 export default function LinksScreen() {
   const [visibleLinks, setVisibleLinks] = useState<Record<string, boolean>>({});
   const [links, setLinks] = useState<Link[]>([]);
+  const [loading, setLoading] = useState(true); // 👈 loading state
   const [editingLink, setEditingLink] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editUrl, setEditUrl] = useState("");
@@ -37,14 +48,15 @@ export default function LinksScreen() {
 
   const getData = async () => {
     try {
+      setLoading(true); // 👈 start loader
       Toast.show({
         type: "info",
         text1: "Loading Links...",
         autoHide: false,
       });
+
       const res = await axios.get<{ link: Link[] }>(`${API_URL}/link`);
       const email = await AsyncStorage.getItem("email");
-
       const user = await axios.post(`${API_URL}/findUser`, { email });
       const linkData = res.data.link;
 
@@ -56,7 +68,7 @@ export default function LinksScreen() {
       Toast.hide();
       Toast.show({
         type: "success",
-        text1: "Links loaded Successfully",
+        text1: "Links loaded successfully",
       });
     } catch (error) {
       Toast.show({
@@ -64,6 +76,9 @@ export default function LinksScreen() {
         text1: "Failed to load links",
         text2: "Please try again later.",
       });
+    } finally {
+      setLoading(false); // 👈 stop loader
+      Toast.hide();
     }
   };
 
@@ -121,7 +136,7 @@ export default function LinksScreen() {
       getData();
       Toast.show({
         type: "success",
-        text1: "Link updated Successfully",
+        text1: "Link updated successfully",
       });
     } catch (error) {
       Toast.show({
@@ -159,111 +174,122 @@ export default function LinksScreen() {
         <View style={{ width: 26 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {links.length === 0 ? (
-          <Text style={styles.noLinksText}>No links are available.</Text>
-        ) : (
-          links.map((link) => (
-            <View key={link._id} style={styles.cardWrapper}>
-              {editingLink === link._id ? (
-                <View style={styles.editCard}>
-                  <TextInput
-                    value={editTitle}
-                    onChangeText={setEditTitle}
-                    style={styles.input}
-                    placeholder="Edit title"
-                    placeholderTextColor="#999"
-                  />
-                  <TextInput
-                    value={editUrl}
-                    onChangeText={setEditUrl}
-                    style={styles.input}
-                    placeholder="Edit URL"
-                    placeholderTextColor="#999"
-                  />
-                  <View style={styles.editActions}>
-                    <TouchableOpacity style={styles.saveBtn} onPress={saveEdit}>
-                      <Ionicons
-                        name="checkmark-circle-outline"
-                        size={24}
-                        color="#00F2C2"
-                      />
-                      <Text style={styles.btnText}>Save</Text>
-                    </TouchableOpacity>
+      {/* ✅ Loader while fetching */}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#00F2C2" />
+          <Text style={styles.loadingText}>Loading Links...</Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          {links.length === 0 ? (
+            <Text style={styles.noLinksText}>No links are available.</Text>
+          ) : (
+            links.map((link) => (
+              <View key={link._id} style={styles.cardWrapper}>
+                {editingLink === link._id ? (
+                  <View style={styles.editCard}>
+                    <TextInput
+                      value={editTitle}
+                      onChangeText={setEditTitle}
+                      style={styles.input}
+                      placeholder="Edit title"
+                      placeholderTextColor="#999"
+                    />
+                    <TextInput
+                      value={editUrl}
+                      onChangeText={setEditUrl}
+                      style={styles.input}
+                      placeholder="Edit URL"
+                      placeholderTextColor="#999"
+                    />
+                    <View style={styles.editActions}>
+                      <TouchableOpacity
+                        style={styles.saveBtn}
+                        onPress={saveEdit}
+                      >
+                        <Ionicons
+                          name="checkmark-circle-outline"
+                          size={24}
+                          color="#00F2C2"
+                        />
+                        <Text style={styles.btnText}>Save</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.cancelBtn}
+                        onPress={() => setEditingLink(null)}
+                      >
+                        <Ionicons
+                          name="close-circle-outline"
+                          size={24}
+                          color="#FF4D6D"
+                        />
+                        <Text style={styles.btnText}>Cancel</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.card}>
                     <TouchableOpacity
-                      style={styles.cancelBtn}
-                      onPress={() => setEditingLink(null)}
+                      style={styles.cardContent}
+                      onPress={() => openLink(link.url)}
                     >
-                      <Ionicons
-                        name="close-circle-outline"
-                        size={24}
-                        color="#FF4D6D"
-                      />
-                      <Text style={styles.btnText}>Cancel</Text>
+                      <Ionicons name="link-outline" size={28} color="#00F2C2" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.cardText}>{link.title}</Text>
+                        <Text style={styles.dateText}>
+                          {formatDate(link.createdAt)}
+                        </Text>
+                      </View>
                     </TouchableOpacity>
-                  </View>
-                </View>
-              ) : (
-                <View style={styles.card}>
-                  <TouchableOpacity
-                    style={styles.cardContent}
-                    onPress={() => openLink(link.url)}
-                  >
-                    <Ionicons name="link-outline" size={28} color="#00F2C2" />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.cardText}>{link.title}</Text>
-                      <Text style={styles.dateText}>
-                        {formatDate(link.createdAt)}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
 
-                  <View style={styles.actionRow}>
-                    <TouchableOpacity onPress={() => toggleLink(link._id)}>
-                      <Ionicons
-                        name={
-                          visibleLinks[link._id]
-                            ? "eye-outline"
-                            : "eye-off-outline"
-                        }
-                        size={22}
-                        color="#fff"
-                      />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => editLink(link)}>
-                      <Ionicons
-                        name="create-outline"
-                        size={22}
-                        color="#00F2C2"
-                      />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => deleteLink(link._id)}>
-                      <Ionicons
-                        name="trash-outline"
-                        size={22}
-                        color="#FF4D6D"
-                      />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => shareLink(link)}>
-                      <Ionicons
-                        name="share-social-outline"
-                        size={22}
-                        color="#00BFFF"
-                      />
-                    </TouchableOpacity>
-                  </View>
-
-                  {visibleLinks[link._id] && (
-                    <View style={styles.urlBox}>
-                      <Text style={styles.urlText}>{link.url}</Text>
+                    <View style={styles.actionRow}>
+                      <TouchableOpacity onPress={() => toggleLink(link._id)}>
+                        <Ionicons
+                          name={
+                            visibleLinks[link._id]
+                              ? "eye-outline"
+                              : "eye-off-outline"
+                          }
+                          size={22}
+                          color="#fff"
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => editLink(link)}>
+                        <Ionicons
+                          name="create-outline"
+                          size={22}
+                          color="#00F2C2"
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => deleteLink(link._id)}>
+                        <Ionicons
+                          name="trash-outline"
+                          size={22}
+                          color="#FF4D6D"
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => shareLink(link)}>
+                        <Ionicons
+                          name="share-social-outline"
+                          size={22}
+                          color="#00BFFF"
+                        />
+                      </TouchableOpacity>
                     </View>
-                  )}
-                </View>
-              )}
-            </View>
-          ))
-        )}
-      </ScrollView>
+
+                    {visibleLinks[link._id] && (
+                      <View style={styles.urlBox}>
+                        <Text style={styles.urlText}>{link.url}</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
+            ))
+          )}
+        </ScrollView>
+      )}
 
       {/* Toast provider */}
       <Toast position="bottom" bottomOffset={50} />
@@ -286,6 +312,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: { color: "#fff", fontSize: 20, fontWeight: "bold" },
   scrollContainer: { paddingBottom: 20 },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loadingText: { color: "#00F2C2", fontSize: 16, fontWeight: "600", marginTop: 10 },
   cardWrapper: { marginBottom: 16 },
   card: {
     backgroundColor: "rgba(255,255,255,0.05)",

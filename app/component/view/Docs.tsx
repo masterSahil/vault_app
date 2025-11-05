@@ -6,7 +6,20 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Alert, Dimensions, FlatList, Image, Modal, Share, StyleSheet, Text, TextInput, TouchableOpacity, View, } from "react-native";
+import {
+  Alert,
+  Dimensions,
+  FlatList,
+  Image,
+  Modal,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  ActivityIndicator, // 👈 added for spinner
+} from "react-native";
 import Toast from "react-native-toast-message";
 
 interface FileItem {
@@ -49,8 +62,12 @@ export default function FileListScreen() {
       const userId = userRes.data.user?._id;
       if (!userId) throw new Error("User not found");
 
-      // Fetch files
-      const res = await axios.get(`${API_URL}/files`);
+      // Fetch files with safe timeout
+      const res = await axios.get(`${API_URL}/files`, { timeout: 8000 });
+      if (!res.data || !Array.isArray(res.data.files)) {
+        throw new Error("Backend not responding. Please wake it up manually.");
+      }
+
       const allFilesData = res.data.files || [];
       const filtered = allFilesData.filter((file) => file.userId === userId);
 
@@ -58,7 +75,9 @@ export default function FileListScreen() {
       Toast.show({ type: "success", text1: "Files fetched successfully" });
     } catch (err: unknown) {
       console.log("Error fetching files:", (err as Error).message);
-      setError("Failed to load files. Check your connection or try again.");
+      setError(
+        "⚠️ Failed to load files. Server may be asleep or unreachable. Please wake it up on Render and tap Retry."
+      );
       setFiles([]);
       Toast.show({ type: "error", text1: "Failed to fetch files" });
     } finally {
@@ -82,6 +101,14 @@ export default function FileListScreen() {
 
   const handleDownload = async (fileUrl: string, fileName: string) => {
     try {
+      if (!fileUrl) {
+        Toast.show({
+          type: "error",
+          text1: "File URL missing, cannot download.",
+        });
+        return;
+      }
+
       const tempFile = `${FileSystem.cacheDirectory}${fileName}`;
       const downloadResult = await FileSystem.downloadAsync(fileUrl, tempFile);
 
@@ -102,12 +129,9 @@ export default function FileListScreen() {
           "application/octet-stream"
         );
 
-      const base64Data = await FileSystem.readAsStringAsync(
-        downloadResult.uri,
-        {
-          encoding: FileSystem.EncodingType.Base64,
-        }
-      );
+      const base64Data = await FileSystem.readAsStringAsync(downloadResult.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
 
       await FileSystem.writeAsStringAsync(fileUri, base64Data, {
         encoding: FileSystem.EncodingType.Base64,
@@ -166,7 +190,7 @@ export default function FileListScreen() {
   const saveUpdate = async () => {
     if (!selectedFile) return;
     try {
-      setUpdating(true); // start loading
+      setUpdating(true);
 
       const formData = new FormData();
       formData.append("title", newTitle || "");
@@ -191,18 +215,18 @@ export default function FileListScreen() {
       Toast.show({ type: "error", text1: "Failed to update file" });
       console.log("Update error:", (err as Error).message);
     } finally {
-      setUpdating(false); // stop loading
+      setUpdating(false);
     }
   };
 
   const renderFileItem = ({ item }: { item: FileItem }) => {
-    const fileUrl = item.fileUrl;
+    const fileUrl = item.fileUrl || "";
+    const baseUrl = fileUrl ? fileUrl.split("?")[0] : "";
 
-    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileUrl.split("?")[0]);
-    const isVideo = /\.(mp4|mov|avi)$/i.test(fileUrl.split("?")[0]);
-    const isPDF = /\.pdf$/i.test(fileUrl.split("?")[0]);
-    const isDoc =
-      /\.(doc|docx|ppt|pptx|xls|xlsx|txt)$/i.test(fileUrl.split("?")[0]);
+    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(baseUrl);
+    const isVideo = /\.(mp4|mov|avi)$/i.test(baseUrl);
+    const isPDF = /\.pdf$/i.test(baseUrl);
+    const isDoc = /\.(doc|docx|ppt|pptx|xls|xlsx|txt)$/i.test(baseUrl);
 
     const formatDate = (dateString: string) => {
       const options: Intl.DateTimeFormatOptions = {
@@ -219,36 +243,43 @@ export default function FileListScreen() {
     return (
       <View style={styles.card}>
         <Text style={styles.title}>{item.title}</Text>
-        {
-          item.description &&
-          <Text style={styles.desc}>{item.description}</Text>
-        } 
-        <View style={{ 
-          flexDirection: "row", 
-          alignItems: "center",   
-          marginBottom: 15
-        }}>
-          <Ionicons name="time-sharp" size={16} color="#bbb" 
-            style={{ marginRight: 4 }} />
+        {item.description && <Text style={styles.desc}>{item.description}</Text>}
+
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            marginBottom: 15,
+          }}
+        >
+          <Ionicons name="time-sharp" size={16} color="#bbb" style={{ marginRight: 4 }} />
           <Text style={styles.dateText}>{formatDate(item.createdAt)}</Text>
         </View>
 
-        {isImage && <Image source={{ uri: fileUrl }} style={styles.filePreview} />}
-        {isVideo && (
+        {!fileUrl ? (
+          <Text style={{ color: "orange", marginBottom: 12 }}>
+            ⚠️ File URL not available (server may be sleeping)
+          </Text>
+        ) : isImage ? (
+          <Image source={{ uri: fileUrl }} style={styles.filePreview} />
+        ) : isVideo ? (
           <Video
             source={{ uri: fileUrl }}
             style={styles.filePreview}
             useNativeControls
             resizeMode={ResizeMode.CONTAIN}
           />
-        )}
-        {(isPDF || isDoc) && (
+        ) : isPDF || isDoc ? (
           <TouchableOpacity style={{ alignItems: "center", marginBottom: 12 }}>
             <Ionicons name="documents-outline" color="#fff" style={{ fontSize: 60 }} />
             <Text style={{ color: "#fff", marginTop: 6 }}>
               {isPDF ? "PDF File" : "Document File"}
             </Text>
           </TouchableOpacity>
+        ) : (
+          <Text style={{ color: "#ccc", marginBottom: 12 }}>
+            Unknown or unsupported file type
+          </Text>
         )}
 
         <View style={styles.actions}>
@@ -283,21 +314,27 @@ export default function FileListScreen() {
 
   return (
     <View style={styles.main}>
-      {/* Header with Back Btn */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Files</Text>
-        <View style={{ width: 24 }} /> 
+        <View style={{ width: 24 }} />
       </View>
 
+      {/* ✅ Beautiful Loading Animation */}
       {loading ? (
-        <Text style={styles.noDataText}>Loading files...</Text>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#00E0C7" />
+          <Text style={styles.loadingText}>Loading Files...</Text>
+        </View>
       ) : error ? (
         <View style={{ alignItems: "center", marginTop: 50 }}>
           <Text style={{ color: "red", fontSize: 16, marginBottom: 10 }}>{error}</Text>
-          <TouchableOpacity onPress={fetchFiles} style={{ backgroundColor: "#2196F3", padding: 10, borderRadius: 6 }}>
+          <TouchableOpacity
+            onPress={fetchFiles}
+            style={{ backgroundColor: "#2196F3", padding: 10, borderRadius: 6 }}
+          >
             <Text style={{ color: "#fff" }}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -362,7 +399,10 @@ export default function FileListScreen() {
             </TouchableOpacity>
             <View style={{ flexDirection: "row", marginTop: 20 }}>
               <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: "gray", flex: 1, marginRight: 5 }]}
+                style={[
+                  styles.actionBtn,
+                  { backgroundColor: "gray", flex: 1, marginRight: 5 },
+                ]}
                 onPress={() => setUpdateModalVisible(false)}
               >
                 <Text style={styles.actionText}>Cancel</Text>
@@ -370,10 +410,14 @@ export default function FileListScreen() {
               <TouchableOpacity
                 style={[
                   styles.actionBtn,
-                  { backgroundColor: updating ? "gray" : "green", flex: 1, marginLeft: 5 },
+                  {
+                    backgroundColor: updating ? "gray" : "green",
+                    flex: 1,
+                    marginLeft: 5,
+                  },
                 ]}
                 onPress={saveUpdate}
-                disabled={updating} // disable while saving
+                disabled={updating}
               >
                 <Text style={styles.actionText}>
                   {updating ? "Saving..." : "Save"}
@@ -409,6 +453,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
     flex: 1,
   },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loadingText: { color: "#00E0C7", fontSize: 16, fontWeight: "600", marginTop: 10 },
   card: {
     backgroundColor: "#170134ff",
     padding: SCREEN_WIDTH * 0.04,
@@ -451,12 +497,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   actionText: { color: "#fff", fontWeight: "600" },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    minHeight: "100%",
-  },
   noDataText: {
     fontSize: 16,
     color: "#ccc",
@@ -471,8 +511,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.6)",
   },
   modalContent: {
-    backgroundColor: "#222", 
-    padding: 20, borderRadius: 12, width: "85%",
+    backgroundColor: "#222",
+    padding: 20,
+    borderRadius: 12,
+    width: "85%",
   },
   modalTitle: {
     fontSize: 18,

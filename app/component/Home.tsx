@@ -123,7 +123,7 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Home Dashboard</Text>
+          <Text style={styles.title}>Vault App</Text>
           <TouchableOpacity onPress={() => router.push("/component/Settings")}>
             <Ionicons name="settings-outline" size={24} color="#00f2c2" />
           </TouchableOpacity>
